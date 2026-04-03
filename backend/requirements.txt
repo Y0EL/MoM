@@ -1,0 +1,41 @@
+# Core API Framework
+fastapi
+uvicorn[standard]
+httpx
+python-dotenv
+pydantic
+
+# OpenAI (Whisper + GPT)
+openai
+
+# CrewAI Multi-Agent Framework
+crewai
+crewai-tools
+
+# Database
+aiosqlite
+
+# Export: PDF
+fpdf2
+reportlab
+
+# Export: DOCX
+python-docx
+
+# Audio Processing
+torch
+torchaudio
+librosa
+soundfile
+pydub
+
+# Speaker Diarization — Option A: NVIDIA NeMo
+# Install separately if GPU available:
+# pip install nemo_toolkit[asr]
+
+# Speaker Diarization — Option B: SpeechBrain (CPU-friendly fallback)
+speechbrain
+
+# Utility
+numpy
+scipy
