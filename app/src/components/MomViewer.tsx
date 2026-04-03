@@ -118,30 +118,29 @@ export default function MomViewer({ meeting, onClose, onExport }: any) {
       .slice(0, 8)
       .join('\n');
 
-    const textToCopy = `RIWAYAT RAPAT: ${meeting.title}\n\nRINGKASAN:\n${summaryBullets}\n\nSelengkapnya di MoM AI Assistant.`;
+    const textToCopy = `RIWAYAT RAPAT: ${meeting.title}\n\nRINGKASAN:\n${summaryBullets}\n\nSelengkapnya di YOTA AI.`;
     navigator.clipboard.writeText(textToCopy);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
   return (
-    <motion.div 
-       initial={{ x: "100%" }}
-       animate={{ x: 0 }}
-       exit={{ x: "100%" }}
-       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-       className="fixed inset-0 bg-white z-[120] flex flex-col"
+    <motion.div
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      className="fixed inset-0 bg-white z-[120] flex flex-col"
     >
       <div className="flex items-center justify-between px-6 py-5 border-b border-[#F0EDE8] bg-white sticky top-0 z-10 pt-10">
         <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-[#F8F7F4] active:bg-[#F0EDE8] transition">
           <ArrowLeft size={24} className="text-[#1A1C1E]" />
         </button>
-        <span className="font-black text-lg tracking-tight">Dokumen MoM</span>
-        
+        <span className="font-black text-lg tracking-tight">YOTA Viewer</span>
         <div className="flex items-center gap-2 relative">
            <button 
               onClick={() => {
-                 const text = `*📋 MoM - ${meeting.title}*\n` +
+                 const text = `*📋 YOTA - ${meeting.title}*\n` +
                               `📅 _${new Date(meeting.date + 'Z').toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}_\n\n` +
                               `*📌 Poin Utama:*\n` +
                               (meeting.mom_document || "").split('\n')
@@ -154,7 +153,7 @@ export default function MomViewer({ meeting, onClose, onExport }: any) {
                                  .slice(0, 2)
                                  .map((a: any) => `- [ ] ${a.task} (_PIC: ${a.pic || 'TBD'}_)`)
                                  .join('\n') +
-                              `\n\n_Selengkapnya di MoM AI Assistant._`;
+                              `\n\n_Selengkapnya di YOTA AI._`;
                  navigator.clipboard.writeText(text);
                  setCopySuccess(true);
                  setTimeout(() => setCopySuccess(false), 2000);
@@ -166,12 +165,13 @@ export default function MomViewer({ meeting, onClose, onExport }: any) {
            >
               {copySuccess ? "BERHASIL!" : "SALIN WA"}
            </button>
-          <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            className="p-2 -mr-2 rounded-full hover:bg-[#F8F7F4] text-[#4F46E5] active:bg-[#F0EDE8] transition"
-          >
-            <Download size={24} />
-          </button>
+
+           <button 
+             onClick={() => setShowExportMenu(!showExportMenu)} 
+             className="p-2 -mr-2 rounded-full hover:bg-[#F8F7F4] text-[#4F46E5] active:bg-[#F0EDE8] transition"
+           >
+             <Download size={24} />
+           </button>
 
           <AnimatePresence>
             {showExportMenu && (

@@ -1,70 +1,77 @@
-# 🍖 Cimeat AI — Asisten Nutrisi Cerdas 2026
+# YOTA - Asisten Rapat AI Cerdas
 
-**Cimeat AI** adalah aplikasi pelacak kalori modern yang menggunakan kekuatan Artificial Intelligence (Vision) untuk membantu kamu hidup lebih sehat. Cukup foto makananmu, dan biarkan AI kami menghitung nutrisinya dalam hitungan detik.
-
----
-
-## ✨ Fitur Utama
-
-- **📸 AI-Powered Scan**: Ambil foto makanan dan biarkan model AI multimodal (qwen3.5) menganalisis kalori & nutrisi makro secara real-time.
-- **🎯 Personalisasi Target**: Setup target kalori, protein, karbohidrat, dan lemak harian yang sesuai dengan kebutuhan tubuhmu.
-- **🌓 Greeting Kontekstual**: Aplikasi yang "hidup" dan menyapa kamu sesuai waktu (pagi, siang, sore, malam).
-- **📊 Statistik Mingguan**: Pantau progres mingguan kamu dengan chart interaktif dan sistem *streak* harian.
-- **🗂️ Riwayat Terorganisir**: Catatan makanan yang dikelompokkan secara otomatis berdasarkan waktu makan (Sarapan, Makan Siang, dll).
-- **🔒 Lokal & Cepat**: Data kamu disimpan secara lokal di browser (`localStorage`), menjaga privasi tetap aman.
+YOTA adalah platform automasi Minutes of Meeting (MoM) profesional yang dirancang untuk meningkatkan produktivitas tim. Dengan menggabungkan teknologi transkripsi suara ke teks dan alur kerja AI multi-agen, YOTA mampu mengubah rekaman rapat mentah menjadi dokumen terstruktur yang mencakup ringkasan eksekutif, poin diskusi utama, serta daftar tugas (action items) yang jelas secara otomatis.
 
 ---
 
-## 🏗️ Arsitektur Teknologi
+## Kemampuan Utama
 
-Aplikasi ini dibangun dengan arsitektur modern yang memisahkan frontend dan AI engine:
-
-- **Frontend**: Next.js 15, React 19, Tailwind CSS v4, Framer Motion (untuk animasi premium).
-- **Backend AI**: FastAPI (Python), Uvicorn.
-- **AI Engine**: Ollama (Vision/Multimodal) menggunakan model `qwen3.5`.
+- **Transkripsi Presisi**: Menggunakan teknologi OpenAI Whisper dengan dukungan pemotongan otomatis (chunking) untuk file audio berdurasi panjang (hingga 3+ jam).
+- **Identifikasi Pembicara (Diarization)**: Mampu mengenali dan memberikan label pada pembicara yang berbeda dalam transkrip secara otomatis.
+- **Generasi MoM Berbasis Agen**: Implementasi sistem multi-agen CrewAI untuk memastikan struktur dokumen yang profesional, logis, dan berkualitas tinggi.
+- **Pemantauan Progress Real-time**: Memberikan pembaruan status dan pelacakan progress secara langsung selama pemrosesan file besar.
+- **Export Multi-Format**: Mendukung ekspor dokumen ke PDF (Formal), DOCX (Editable), Markdown, dan teks biasa.
+- **Manajemen Tugas Terintegrasi**: Sinkronisasi status tugas langsung dari dokumen MoM ke database untuk pemantauan tindak lanjut rapat.
 
 ---
 
-## 📁 Struktur Proyek
+## Arsitektur Teknologi
+
+YOTA dibangun dengan stack teknologi modern untuk performa dan skalabilitas tinggi:
+
+- **Frontend**: Next.js 15, React 19, Tailwind CSS, Framer Motion (Antarmuka Premium UI/UX).
+- **Backend API**: FastAPI (Python), Uvicorn.
+- **Engine Kecerdasan Buatan**: 
+  - OpenAI Whisper (Speech-to-Text)
+  - OpenAI GPT-4o/Nano (LLM)
+  - CrewAI (Alur Kerja Agentic)
+- **Database**: SQLite dengan library aiosqlite untuk manajemen data lokal yang efisien.
+- **Pemrosesan Dokumen**: Pydub untuk manipulasi audio, serta fpdf2 dan python-docx untuk pembuatan dokumen.
+
+---
+
+## Struktur Proyek
 
 ```
-CimeatApp/
-├── app/                # 🌐 Web Frontend (Next.js)
-│   ├── src/app/        # Core logic & UI components
-│   └── public/         # Aset statis
-├── backend/            # 🐍 AI Engine (FastAPI)
-│   ├── services/       # AI logic & integration prompt
-│   └── main.py         # API server endpoints
-└── scripts/            # Script pembantu (reset project, dll)
+YOTA/
+├── app/                # Frontend Web (Next.js)
+│   ├── src/app/        # Halaman utama dan tata letak
+│   └── src/components/ # Komponen UI reusable
+├── backend/            # Backend API (FastAPI)
+│   ├── services/       # Logika AI, Database, dan Export
+│   └── main.py         # Titik masuk API dan konfigurasi server
+└── mom.db              # Database SQLite lokal
 ```
 
 ---
 
-## 🚀 Cara Menjalankan
+## Cara Menjalankan
 
-### 1. Jalankan Backend (AI Engine)
-Pastikan kamu sudah menginstal Python dan dependency yang dibutuhkan:
+### 1. Menjalankan Backend
+Pastikan Python 3.10 ke atas telah terinstal.
 ```bash
 cd backend
 pip install -r requirements.txt
 python main.py
 ```
-*Note: Pastikan Ollama sudah berjalan di background.*
 
-### 2. Jalankan Frontend
+### 2. Menjalankan Frontend
 Gunakan npm untuk menjalankan aplikasi web:
 ```bash
 cd app
 npm install
 npm run dev
 ```
-Buka [http://localhost:3000](http://localhost:3000) di browser kesayanganmu.
+Akses aplikasi melalui browser di: [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## ⚠️ Lingkungan Pengembangan (.env)
-Pastikan kamu telah mengatur file `.env` di folder `backend` dengan konfigurasi Ollama yang benar agar fitur Scan bisa berfungsi.
+## Konfigurasi Lingkungan
+
+Konfigurasi variabel lingkungan pada file `backend/.env`:
+- `OPENAI_API_KEY`: API Key OpenAI untuk transkripsi dan analisis.
+- `OPENAI_MODEL`: Model bahasa yang digunakan (default: gpt-4o).
 
 ---
 
-**Dibuat dengan ❤️ untuk gaya hidup sehat tahun 2026.**
+© 2026 YOTA AI. Hak Cipta Dilindungi Undang-Undang.

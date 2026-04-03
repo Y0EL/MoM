@@ -103,9 +103,13 @@ class ExportService:
             date_str = _safe_date(meeting.get("date", ""))
             lang = "Bahasa Indonesia" if meeting.get("language") == "id" else "English"
             meta_text = f"Tanggal: {date_str} | Bahasa: {lang}"
-            duration = meeting.get("duration_seconds", 0)
-            if duration:
-                meta_text += f" | Durasi: {duration // 60}m"
+            
+            duration_sec = meeting.get("duration_seconds", 0)
+            if duration_sec:
+                h = int(duration_sec // 3600)
+                m = int((duration_sec % 3600) // 60)
+                d_str = f"{h}j {m}m" if h > 0 else f"{m}m"
+                meta_text += f" | Durasi: {d_str}"
             
             pdf.cell(0, 7, _clean_text(meta_text), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             
@@ -185,8 +189,8 @@ class ExportService:
                 
                 pdf.set_font("Helvetica", "", 10)
                 pdf.set_text_color(30, 41, 59)
-                pdf.write(6, line[2:], markdown=True)
-                pdf.ln(8)
+                pdf.multi_cell(0, 6, line[2:].strip(), markdown=True)
+                pdf.ln(2)
 
             # Numbered list
             elif len(line) > 2 and line[0].isdigit() and (line[1] == "." or (len(line) > 2 and line[2] == ".")):
@@ -196,15 +200,15 @@ class ExportService:
                 pdf.cell(8, 6, line[:dot_pos+1], align="L")
                 
                 pdf.set_font("Helvetica", "", 10)
-                pdf.write(6, line[dot_pos+1:].strip(), markdown=True)
-                pdf.ln(8)
+                pdf.multi_cell(0, 6, line[dot_pos+1:].strip(), markdown=True)
+                pdf.ln(2)
 
             # Normal paragraph
             else:
                 pdf.set_font("Helvetica", "", 10)
                 pdf.set_text_color(30, 41, 59)
-                pdf.write(6, line, markdown=True)
-                pdf.ln(8)
+                pdf.multi_cell(0, 6, line, markdown=True)
+                pdf.ln(2)
 
     def _render_action_items_pdf(self, pdf, action_items: list):
         """Render action items sebagai tabel berwarna di halaman terpisah."""
@@ -422,6 +426,12 @@ class ExportService:
         duration = meeting.get("duration_seconds", 0)
         language = "Bahasa Indonesia" if meeting.get("language") == "id" else "English"
 
+        # Duration Logic
+        duration_sec = meeting.get("duration_seconds", 0)
+        h = int(duration_sec // 3600)
+        m = int((duration_sec % 3600) // 60)
+        d_str = f"{h} jam {m} menit" if h > 0 else f"{m} menit"
+
         # Header
         lines += [
             sep,
@@ -430,7 +440,7 @@ class ExportService:
             sep,
             "",
             f"Tanggal   : {date_str}",
-            f"Durasi    : {duration // 60} menit",
+            f"Durasi    : {d_str}",
             f"Bahasa    : {language}",
         ]
         if participants:
@@ -493,17 +503,22 @@ class ExportService:
         duration = meeting.get("duration_seconds", 0)
         language = "🇮🇩 Bahasa Indonesia" if meeting.get("language") == "id" else "🇺🇸 English"
 
+        duration_sec = meeting.get("duration_seconds", 0)
+        h = int(duration_sec // 3600)
+        m = int((duration_sec % 3600) // 60)
+        d_str = f"{h} jam {m} menit" if h > 0 else f"{m} menit"
+
         lines = [
             f"# 📋 {title}",
             "",
-            "> **Minutes of Meeting** — Dihasilkan otomatis oleh MoM AI Assistant",
+            "> **Minutes of Meeting** — Dihasilkan otomatis oleh YOTA AI",
             "",
             "## 📌 Informasi Meeting",
             "",
             "| Field | Detail |",
             "|---|---|",
             f"| 📅 Tanggal | {date_str} |",
-            f"| ⏱️ Durasi | {duration // 60} menit |",
+            f"| ⏱️ Durasi | {d_str} |",
             f"| 🌐 Bahasa | {language} |",
         ]
 

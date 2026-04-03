@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="MoM AI Engine",
-    description="AI-powered Minutes of Meeting Assistant",
+    title="YOTA AI Engine",
+    description="Intelligent AI-powered Minutes of Meeting Assistant",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -187,6 +187,7 @@ async def transcribe_audio(
                 "text": full_text,
                 "segments": diarized_segments,
                 "language": whisper_result.get("language", language),
+                "duration_seconds": whisper_result.get("duration_seconds", 0),
                 "diarization_engine": diarization_service.engine,
                 "segment_count": len(diarized_segments),
             }

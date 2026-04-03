@@ -274,6 +274,9 @@ export default function App() {
           
           if (transcribeRes.ok) {
             const tData = await transcribeRes.json();
+            if (tData.duration_seconds) {
+               duration = tData.duration_seconds;
+            }
             if (tData.text && tData.text.trim().length > 2) {
               finalTranscription = tData.text; 
             } else {
@@ -338,13 +341,14 @@ export default function App() {
          if (!transcribeRes.ok) throw new Error("Gagal mentranskripsi audio upload");
          const tData = await transcribeRes.json();
          const finalTranscription = tData.text;
+         const finalDuration = tData.duration_seconds || 0;
 
          if (!finalTranscription) throw new Error("Audio kosong atau gagal diterjemahkan");
 
          setIsProcessing(false);
          setProcessingStage("");
          setActiveTab("history");
-         executeStream(finalTranscription, language, 0);
+         executeStream(finalTranscription, language, finalDuration);
 
      } catch(err: any) {
          alert(err.message || "Gagal mengupload audio");
@@ -468,14 +472,14 @@ export default function App() {
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-black text-[#1A1C1E] tracking-tight holographic-text font-serif italic">
-               MoM
+               YOTA
             </h1>
             <div className="bg-[#4F46E5]/10 px-2 py-0.5 rounded-md flex items-center gap-1.5">
               <Zap size={10} className="text-[#4F46E5] fill-[#4F46E5]" />
               <span className="text-[10px] text-[#4F46E5] font-black uppercase tracking-widest">AI Agent</span>
             </div>
           </div>
-          <p className="text-xs font-bold text-[#8A8886]">Your Smart Meeting Assistant</p>
+          <p className="text-xs font-bold text-[#8A8886]">Your Intelligent AI Assistant</p>
         </div>
         <button onClick={() => setActiveTab("settings")} className="relative group">
           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#1A1C1E] shadow-sm border border-[#F0EDE8] active:scale-95 transition-transform">

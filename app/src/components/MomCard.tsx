@@ -69,7 +69,11 @@ export default function MomCard({ meeting, onClick, onDelete, onRetry }: any) {
         {meeting.duration_seconds > 0 && (
            <div className="flex items-center gap-1.5 text-[#8A8886]">
              <Clock size={14} />
-             <span className="text-xs font-bold">{Math.floor(meeting.duration_seconds / 60)}m {meeting.duration_seconds % 60}s</span>
+             <span className="text-xs font-bold">
+               {meeting.duration_seconds >= 3600 ? 
+                 `${Math.floor(meeting.duration_seconds / 3600)}j ${Math.floor((meeting.duration_seconds % 3600) / 60)}m` : 
+                 `${Math.floor(meeting.duration_seconds / 60)}m ${Math.floor(meeting.duration_seconds % 60)}s`}
+             </span>
            </div>
         )}
         

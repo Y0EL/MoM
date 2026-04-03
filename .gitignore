@@ -40,3 +40,6 @@ app-example
 .next
 .env
 __pycache__
+
+mom.db
+.db

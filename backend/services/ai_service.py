@@ -111,6 +111,7 @@ class AIService:
                 "text": all_text.strip(),
                 "segments": all_segments,
                 "language": detected_language,
+                "duration_seconds": round(duration_ms / 1000.0, 2)
             }
 
         except Exception as e:

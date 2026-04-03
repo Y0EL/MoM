@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Cimeat AI - Smart Calorie Tracker",
-  description: "2026 Premium Healthy Assistant",
+  title: "YoTa",
+  description: "Next-gen Minutes of Meeting AI Co-Pilot",
 };
 
 export default function RootLayout({
