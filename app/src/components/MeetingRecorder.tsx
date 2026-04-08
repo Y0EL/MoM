@@ -1,16 +1,32 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { Mic, X, Check, Loader2, StopCircle } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, Loader2, Mic, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useContextStore } from "../stores/contextStore";
+import { useMeetingStore } from "../stores/meetingStore";
 import { cn } from "./Common";
+import SplitMeetingLayout from "./SplitMeetingLayout";
 
 export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessing, currentStage }: any) {
-  const [transcript, setTranscript] = useState("");
-  const [finalTranscript, setFinalTranscript] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [volumes, setVolumes] = useState(new Array(25).fill(5));
-  const [duration, setDuration] = useState(0);
+  const { 
+    transcript, 
+    finalTranscript, 
+    isListening, 
+    volumes, 
+    duration, 
+    isActive,
+    setTranscript,
+    setFinalTranscript,
+    setListening,
+    setVolumes,
+    setDuration,
+    startMeeting,
+    endMeeting,
+    resetMeeting
+  } = useMeetingStore();
+  
+  const { resetContextState } = useContextStore();
   
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -48,7 +64,8 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
       // Start Timer
       setDuration(0);
       timerRef.current = setInterval(() => {
-         setDuration(d => d + 1);
+         const currentState = useMeetingStore.getState();
+         setDuration(currentState.duration + 1);
       }, 1000);
 
     } catch (err) {
@@ -94,12 +111,16 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
 
   useEffect(() => {
     if (isOpen) {
+      resetMeeting();
+      resetContextState();
       setTranscript("");
       setFinalTranscript("");
       setIsConfirming(false);
+      startMeeting();
       startSession();
     } else {
       stopListening();
+      endMeeting();
     }
     return () => stopListening();
   }, [isOpen]);
@@ -113,7 +134,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
     recognitionRef.current.interimResults = true;
     recognitionRef.current.continuous = true;
 
-    recognitionRef.current.onstart = () => setIsListening(true);
+    recognitionRef.current.onstart = () => setListening(true);
     recognitionRef.current.onresult = (event: any) => {
       let interim = "";
       let final = "";
@@ -122,8 +143,10 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
         else interim += event.results[i][0].transcript;
       }
       if (final) {
-         setFinalTranscript(prev => prev + final);
+         const currentState = useMeetingStore.getState();
+         setFinalTranscript(currentState.finalTranscript + final);
       }
+      // Always set interim text for real-time display
       setTranscript(interim);
     };
 
@@ -132,7 +155,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
        if (isOpen && !isConfirming && !isProcessing) {
           try { recognitionRef.current.start(); } catch(e) {}
        } else {
-          setIsListening(false);
+          setListening(false);
        }
     };
     try { recognitionRef.current.start(); } catch(e) {}
@@ -152,7 +175,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    setIsListening(false);
+    setListening(false);
   };
 
   const [isConfirming, setIsConfirming] = useState(false);
@@ -195,7 +218,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    setIsListening(false);
+    setListening(false);
   };
 
   const formatTime = (sec: number) => {
@@ -269,61 +292,9 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
              </div>
           </div>
           
-          <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6 overflow-hidden">
-             {/* Visualizer Area */}
-             <div className="w-full bg-[var(--bg)] rounded-[2.5rem] border border-[var(--border-color)] p-8 flex items-center justify-center gap-2 shadow-inner h-32">
-               {volumes.map((vol, i) => (
-                 <motion.div
-                   key={`bar-${i}`}
-                   animate={{ 
-                     height: isProcessing ? [10, 30, 10] : (isListening ? vol : 5),
-                     opacity: isProcessing ? 0.3 : (isListening ? 1 : 0.3)
-                   }}
-                   transition={isProcessing ? { repeat: Infinity, duration: 1.5, delay: i * 0.08 } : { duration: 0.1 }}
-                   className="w-2 bg-[var(--color-orange)] rounded-full shadow-sm"
-                 />
-               ))}
-             </div>
-
-             {/* Transcript Scroll Area */}
-             <div 
-                ref={transcriptScrollRef}
-                className="flex-1 w-full bg-white rounded-[2.5rem] border border-[var(--border-color)] p-10 flex flex-col relative overflow-hidden shadow-sm shadow-indigo-100/10"
-             >
-                {!currentText && !isProcessing && (
-                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                      <div className="w-16 h-16 rounded-full bg-[var(--bg)] flex items-center justify-center text-[#8A8886]/30">
-                         <Mic size={32} />
-                      </div>
-                      <p className="text-center italic text-[#8A8886]/60 font-black uppercase tracking-widest text-[10px]">Silakan mulai berbicara...</p>
-                   </div>
-                )}
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
-                  {finalTranscript && (
-                     <p className="text-lg font-bold leading-relaxed text-[var(--text-main)]/80 mb-4 antialiased whitespace-pre-wrap">{finalTranscript}</p>
-                  )}
-                  {transcript && (
-                     <p className="text-lg font-bold leading-relaxed text-[var(--color-orange)] antialiased animate-pulse">{transcript}</p>
-                  )}
-                </div>
-
-                {/* Processing Overlay inside Transcript block */}
-                <AnimatePresence>
-                   {isProcessing && (
-                      <motion.div 
-                         initial={{ opacity: 0 }} 
-                         animate={{ opacity: 1 }} 
-                         className="absolute inset-0 bg-white/90 backdrop-blur-[6px] flex flex-col items-center justify-center z-10 p-10"
-                      >
-                         <div className="w-16 h-16 rounded-full bg-[var(--color-orange)]/10 flex items-center justify-center mb-6">
-                            <Loader2 size={32} className="text-[var(--color-orange)] animate-spin" />
-                         </div>
-                         <h3 className="font-black text-2xl text-[var(--text-main)] text-center max-w-sm tracking-tight">{mapStageToLabel(currentStage)}</h3>
-                         <p className="text-xs font-black text-[#8A8886] uppercase tracking-widest mt-4 bg-[var(--bg)] px-4 py-1.5 rounded-full border border-[var(--border-color)]">Durasi Rekaman: {formatTime(duration)}</p>
-                      </motion.div>
-                   )}
-                </AnimatePresence>
-             </div>
+          {/* Split Meeting Layout */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <SplitMeetingLayout />
           </div>
 
           {/* Actions Footer */}
@@ -332,7 +303,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                 {!isProcessing ? (
                    <button 
                       onClick={handleStopAndProcess}
-                      disabled={isConfirming || (!currentText && duration < 3)}
+                      disabled={isConfirming || (!finalTranscript && !transcript && duration < 3)}
                       className="w-full h-16 rounded-2xl bg-[var(--color-orange)] hover:bg-[#C86646] text-white font-black tracking-tight active:scale-[0.98] transition-all shadow-xl shadow-[var(--color-orange)]/30 flex items-center justify-center gap-3 disabled:opacity-50 text-lg"
                    >
                       {isConfirming ? <Loader2 size={24} className="animate-spin" /> : <Check size={24} strokeWidth={3} />}

@@ -12,10 +12,14 @@ import MomViewer from "../components/MomViewer";
 import SettingsTab from "../components/SettingsTab";
 import UploadTab from "../components/UploadTab";
 
+// Stores
+import { useMeetingStore } from "../stores/meetingStore";
+
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 export default function App() {
    const router = useRouter();
+   const { setMeetingId } = useMeetingStore();
 
    // App State
    const [activeTab, setActiveTab] = useState<"live" | "upload" | "history" | "settings">("live");
@@ -199,6 +203,7 @@ export default function App() {
       const prevPercent = activeMeeting?.id === meeting.id ? activeMeeting.transcribe_percent : null;
 
       setActiveMeeting(meeting);
+      setMeetingId(meeting.id); // Set meeting ID for correction panel
       try {
          const res = await fetch(`${BACKEND_URL}/mom/${meeting.id}`);
          if (res.ok) {

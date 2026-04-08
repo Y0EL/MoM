@@ -33,6 +33,7 @@ from services.mom_service import mom_service
 from services.database_service import database_service
 from services.export_service import export_service
 from services.diarization_service import diarization_service
+from services.context_service import init_context_service, context_service
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan: startup dan shutdown."""
     # Startup
     await database_service.init()
+    init_context_service(ai_service)
     logger.info("[MoM] Backend started. Database initialized.")
     yield
     # Shutdown (jika ada cleanup)
@@ -94,9 +96,22 @@ class ProcessRequest(BaseModel):
 class ActionItemStatusUpdate(BaseModel):
     status: str  # "pending" or "done"
 
+class ContextRequest(BaseModel):
+    transcript: str
+    segment_index: int
+    time_range: dict
+    user_context: str = ""
+
 
 class MeetingStatusUpdate(BaseModel):
     status: str  # "processing", "done", "error"
+
+
+class WordCorrectionRequest(BaseModel):
+    meeting_id: str
+    word_index: int
+    original_word: str
+    corrected_word: str
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -651,6 +666,121 @@ async def update_action_item(item_id: str, data: ActionItemStatusUpdate):
 
     await database_service.update_action_item_status(item_id, data.status)
     return {"success": True, "item_id": item_id, "status": data.status}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Word Corrections API Endpoints
+# ──────────────────────────────────────────────────────────────────────
+@app.post("/word-corrections")
+async def upsert_word_correction(data: WordCorrectionRequest):
+    """Insert atau update word correction untuk sebuah meeting."""
+    try:
+        # Validate meeting exists
+        meeting = await database_service.get_meeting(data.meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting tidak ditemukan")
+        
+        correction_id = await database_service.upsert_word_correction(
+            data.meeting_id, 
+            data.word_index, 
+            data.original_word, 
+            data.corrected_word
+        )
+        
+        return {
+            "success": True, 
+            "correction_id": correction_id,
+            "meeting_id": data.meeting_id,
+            "word_index": data.word_index,
+            "original_word": data.original_word,
+            "corrected_word": data.corrected_word
+        }
+    except Exception as e:
+        logger.error(f"[WordCorrection] Upsert failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan koreksi: {str(e)}")
+
+
+@app.get("/word-corrections/{meeting_id}")
+async def get_word_corrections(meeting_id: str):
+    """Ambil semua word corrections dari sebuah meeting."""
+    try:
+        # Validate meeting exists
+        meeting = await database_service.get_meeting(meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting tidak ditemukan")
+        
+        corrections = await database_service.get_word_corrections(meeting_id)
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "corrections": corrections
+        }
+    except Exception as e:
+        logger.error(f"[WordCorrection] Get failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal mengambil koreksi: {str(e)}")
+
+
+@app.delete("/word-corrections/{meeting_id}/{word_index}")
+async def delete_word_correction(meeting_id: str, word_index: int):
+    """Hapus word correction untuk word index tertentu."""
+    try:
+        # Validate meeting exists
+        meeting = await database_service.get_meeting(meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting tidak ditemukan")
+        
+        success = await database_service.delete_word_correction(meeting_id, word_index)
+        return {
+            "success": success,
+            "meeting_id": meeting_id,
+            "word_index": word_index
+        }
+    except Exception as e:
+        logger.error(f"[WordCorrection] Delete failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus koreksi: {str(e)}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# POST /mom/context/compact — Generate Context Card
+# ──────────────────────────────────────────────────────────────────────
+@app.post("/mom/context/compact")
+async def generate_context_card(data: ContextRequest):
+    """Generate context card dari transcript segment."""
+    try:
+        context_card = await context_service.generate_context_card(
+            transcript=data.transcript,
+            segment_index=data.segment_index,
+            time_range=data.time_range,
+            user_context=data.user_context
+        )
+        
+        # Save to database (if meeting_id is provided later)
+        # This will be called when meeting ends
+        
+        return {
+            "success": True,
+            "context_card": context_card.dict()
+        }
+    except Exception as e:
+        logger.error(f"[Context] Generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Context generation failed: {str(e)}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# GET /mom/{meeting_id}/context — Get Context Cards
+# ──────────────────────────────────────────────────────────────────────
+@app.get("/mom/{meeting_id}/context")
+async def get_context_cards(meeting_id: str):
+    """Get all context cards untuk meeting."""
+    try:
+        context_cards = await database_service.get_context_cards(meeting_id)
+        return {
+            "success": True,
+            "context_cards": context_cards
+        }
+    except Exception as e:
+        logger.error(f"[Context] Failed to get context cards: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get context cards: {str(e)}")
 
 
 if __name__ == "__main__":
