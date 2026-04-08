@@ -13,12 +13,23 @@ import os
 import json
 import logging
 import asyncio
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, List
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
+
+
+class CompactedChunk(BaseModel):
+    """Schema untuk memastikan tidak ada informasi kunci yang hilang saat auto-compact."""
+    summary: str = Field(description="Ringkasan narasi dari bagian ini")
+    key_decisions: List[str] = Field(default_factory=list, description="Keputusan konkret yang diambil di bagian ini")
+    participants_mentioned: List[str] = Field(default_factory=list, description="Nama peserta yang aktif berbicara atau disebut")
+    unresolved_issues: List[str] = Field(default_factory=list, description="Masalah atau pertanyaan yang belum terjawab")
+    action_items_found: List[str] = Field(default_factory=list, description="Tugas atau janji tindak lanjut yang muncul")
+    important_keywords: List[str] = Field(default_factory=list, description="Kata kunci teknis atau istilah penting")
+
 
 
 PROMPTS = {
@@ -126,8 +137,17 @@ class MomService:
             llm = LLM(
                 model=f"openai/{self.model}",
                 api_key=self.openai_api_key,
-                temperature=0.3,
+                temperature=1,
             )
+
+            # ── AUTO-COMPACT: Maximize Context (Rolling Summarization) ──
+            # Jika transcript > threshold, kita "compact" dulu biar muat di context window
+            THRESHOLD_COMPACT = int(os.getenv("AUTO_COMPACT_THRESHOLD", "20000"))
+            
+            if len(transcript) > THRESHOLD_COMPACT:
+                yield json.dumps({"stage": "compacting", "content": "📦 Transcript terlalu panjang, melakukan Auto-Compact... (Maximizing Context)"})
+                transcript = await self._auto_compact_transcript(transcript, language, llm)
+                yield json.dumps({"stage": "compacting_done", "content": f"✅ Auto-Compact selesai. Ukuran context sekarang: {len(transcript)} karakter."})
 
             # ── AGENT 1: Transcript Cleaner ───────────────────────
             yield json.dumps({"stage": "cleaning", "content": "🧹 Membersihkan transcript..."})
@@ -365,6 +385,79 @@ class MomService:
             logger.error(f"[MomService] Pipeline error: {e}")
             yield json.dumps({"stage": "error", "content": f"Error dalam proses CrewAI: {str(e)}"})
 
+    async def _auto_compact_transcript(self, text: str, language: str, llm) -> str:
+        """
+        Gunakan strategi chunking + structured summarization (autoCompact) untuk menangani transkrip panjang.
+        Memasukkan Pydantic (Zod-like) schema untuk menjamin tidak ada info kunci yang hilang.
+        """
+        from crewai import Agent, Task, Crew, Process
+        
+        CHUNK_SIZE = 12000 # Ukuran chunk sedikit lebih besar karena kita pakai pydantic
+        OVERLAP = 1000
+        
+        chunks = []
+        for i in range(0, len(text), CHUNK_SIZE - OVERLAP):
+            chunks.append(text[i:i + CHUNK_SIZE])
+            
+        compacted_texts = []
+        rolling_context_summary = "Belum ada (ini adalah bagian awal rapat)."
+        
+        # Buat Compacter Agent khusus
+        compacter_agent = Agent(
+            role="Specialist Meeting Compactor",
+            goal="Menyederhanakan transkrip panjang tanpa kehilangan poin-poin krusial",
+            backstory=(
+                "Kamu ahli dalam memampatkan teks legal dan korporat. Tugas utamamu adalah "
+                "mengambil inti sari pembicaraan sambil memastikan setiap keputusan, "
+                "tugas, dan nama orang yang disebutkan tetap terjaga dalam struktur yang rapi."
+            ),
+            llm=llm,
+            verbose=False,
+            allow_delegation=False
+        )
+
+        for i, chunk in enumerate(chunks):
+            logger.info(f"[AutoCompact] Memproses chunk {i+1}/{len(chunks)}...")
+            
+            task_desc = (
+                f"Analisis bagian transkrip rapat ({i+1}/{len(chunks)}) berikut.\n"
+                f"KONTEKS SEBELUMNYA: {rolling_context_summary}\n\n"
+                f"ISI BAGIAN INI:\n{chunk}\n\n"
+                "EKSTRAK SECARA STRUKTUR: Ringkasan narasi, keputusan, peserta, masalah belum selesai, dan action items."
+            )
+            
+            compact_task = Task(
+                description=task_desc,
+                expected_output="Struktur data CompactedChunk yang berisi poin-poin kunci dari bagian ini.",
+                agent=compacter_agent,
+                output_pydantic=CompactedChunk
+            )
+            
+            crew = Crew(agents=[compacter_agent], tasks=[compact_task], process=Process.sequential, verbose=False)
+            result = crew.kickoff()
+            
+            # CrewAI kickoff return value has pydantic result if specified
+            structured_data: CompactedChunk = result.pydantic
+            
+            if structured_data:
+                # Susun ulang menjadi teks yang sangat informatif untuk stage berikutnya
+                formatted_chunk = (
+                    f"### BAGIAN {i+1}\n"
+                    f"**Ringkasan:** {structured_data.summary}\n"
+                    f"**Keputusan:** {', '.join(structured_data.key_decisions) if structured_data.key_decisions else 'N/A'}\n"
+                    f"**Peserta Aktif:** {', '.join(structured_data.participants_mentioned)}\n"
+                    f"**Masalah Gantung:** {', '.join(structured_data.unresolved_issues) if structured_data.unresolved_issues else 'N/A'}\n"
+                    f"**Action Items:** {', '.join(structured_data.action_items_found) if structured_data.action_items_found else 'None'}\n"
+                    f"**Terminologi:** {', '.join(structured_data.important_keywords)}\n"
+                )
+                compacted_texts.append(formatted_chunk)
+                rolling_context_summary = structured_data.summary # Update context untuk chunk berikutnya
+            else:
+                compacted_texts.append(f"### BAGIAN {i+1} [Raw Fallback]\n{chunk[:2000]}")
+
+        final_result = "\n---\n".join(compacted_texts)
+        return final_result
+
     async def process_transcript(
         self,
         transcript: str,
@@ -399,7 +492,7 @@ class MomService:
             llm = LLM(
                 model=f"openai/{self.model}",
                 api_key=self.openai_api_key,
-                temperature=0.4,
+                temperature=1,
             )
             
             prompt = (
@@ -424,7 +517,7 @@ class MomService:
             # Fallback simple logic
             words = transcript.strip().split()[:7]
             return " ".join(words) + "..."
-
+            
 
 # Singleton
 mom_service = MomService()

@@ -1,5 +1,5 @@
 {
-  "name": "cimeat-web-2026",
+  "name": "YoTa",
   "version": "1.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
     "framer-motion": "latest",
     "html-to-image": "^1.11.13",
     "lucide-react": "latest",
-    "next": "15.1.7",
+    "next": "^15.5.14",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "tailwind-merge": "latest"

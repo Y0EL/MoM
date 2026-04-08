@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "backend": "cd backend && python main.py",
     "frontend": "cd app && npm run dev",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+    "kill-be": "taskkill /F /IM python.exe /T || exit 0",
+    "dev": "npm run kill-be && concurrently \"npm run backend\" \"npm run frontend\""
   },
   "dependencies": {
     "@apollo/client": "^4.0.7",

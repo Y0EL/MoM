@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --color-orange: #FF6B35;
-  --color-orange-light: #FF8C61;
+  --color-orange: #D97757;
+  --color-orange-light: #E89B82;
   --animate-float: float 3s ease-in-out infinite;
   
   @keyframes float {
@@ -12,33 +12,55 @@
 }
 
 :root {
-  --bg: #F8F7F4;
+  --bg: #FDFBF7;
+  --bg-sidebar: #F4F0E6;
+  --border-color: #E8E4D9;
   --card: #FFFFFF;
-  --text-main: #1A1C1E;
-  --text-dim: #8A8886;
+  --text-main: #2D2926;
+  --text-dim: #7E7974;
+  --color-orange: #D97757;
+  --color-orange-light: #E89B82;
+}
+
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px -10px rgba(217, 119, 87, 0.15);
+  border-color: var(--color-orange-light);
 }
 
 body {
   background-color: var(--bg);
   color: var(--text-main);
-  font-family: 'Outfit', 'Inter', sans-serif;
+  font-family: var(--font-inter), 'Inter', sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, .font-serif {
+  font-family: var(--font-serif), 'Instrument Serif', serif;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 0px;
+  width: 6px;
   background: transparent;
 }
 
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+::-webkit-scrollbar-thumb {
+  background: #D9D5CC;
+  border-radius: 10px;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Premium Visuals */
@@ -50,7 +72,7 @@ body {
 }
 
 .holographic-text {
-  background: linear-gradient(135deg, #FF6B35 0%, #FF8C61 50%, #FF6B35 100%);
+  background: linear-gradient(135deg, #D97757 0%, #E89B82 50%, #D97757 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -64,10 +86,6 @@ body {
   }
 }
 
-.orbit-glow {
-  filter: drop-shadow(0 0 15px rgba(255, 107, 53, 0.3));
-}
-
 .animate-slide-up {
   animation: slideUp 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
@@ -77,11 +95,10 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Premium Card Hover */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
 }

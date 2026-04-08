@@ -40,6 +40,7 @@ class DatabaseService:
                     diarization_segments TEXT DEFAULT '[]',
                     language TEXT DEFAULT 'id',
                     status TEXT DEFAULT 'processing',
+                    task_id TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -61,8 +62,30 @@ class DatabaseService:
                 CREATE INDEX IF NOT EXISTS idx_action_items_meeting ON action_items(meeting_id);
                 CREATE INDEX IF NOT EXISTS idx_action_items_status ON action_items(status);
             """)
+            
+            # --- AUTO MIGRATION: Check if task_id exists (for existing DBs) ---
+            try:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("PRAGMA table_info(meetings)") as cursor:
+                    columns = [row['name'] for row in await cursor.fetchall()]
+                    if 'task_id' not in columns:
+                        logger.info("[DB] Migrating: Adding missing 'task_id' column to meetings table")
+                        await db.execute("ALTER TABLE meetings ADD COLUMN task_id TEXT DEFAULT ''")
+            except Exception as e:
+                logger.warning(f"[DB] Auto-migration check failed (ignoring): {e}")
+
             await db.commit()
-        logger.info(f"[DB] Database initialized: {self.db_path}")
+        
+        # Cleanup stale processing meetings from previous sessions
+        await self.cleanup_stale_meetings()
+        logger.info(f"[DB] Database initialized and cleaned: {self.db_path}")
+
+    async def cleanup_stale_meetings(self):
+        """Ubah semua meeting 'processing' menjadi 'error' saat startup agar tidak nyangkut."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE meetings SET status = 'error' WHERE status = 'processing'")
+            await db.commit()
+            logger.info("[DB] Stale 'processing' meetings cleared.")
 
     async def create_meeting(
         self,
@@ -70,6 +93,8 @@ class DatabaseService:
         language: str = "id",
         participants: list = None,
         duration_seconds: int = 0,
+        task_id: str = "",
+        status: str = "processing",
     ) -> str:
         """Buat meeting baru dan return ID-nya."""
         meeting_id = str(uuid.uuid4())
@@ -78,8 +103,8 @@ class DatabaseService:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO meetings 
-                   (id, title, date, duration_seconds, participants, language, status, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, 'processing', ?, ?)""",
+                   (id, title, date, duration_seconds, participants, language, status, task_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     meeting_id,
                     title,
@@ -87,13 +112,15 @@ class DatabaseService:
                     duration_seconds,
                     json.dumps(participants or []),
                     language,
+                    status,
+                    task_id,
                     now,
                     now,
                 ),
             )
             await db.commit()
 
-        logger.info(f"[DB] Meeting created: {meeting_id} — '{title}'")
+        logger.info(f"[DB] Meeting created: {meeting_id} (Task: {task_id}) — '{title}'")
         return meeting_id
 
     async def update_meeting(self, meeting_id: str, **fields) -> bool:
@@ -138,13 +165,13 @@ class DatabaseService:
             db.row_factory = aiosqlite.Row
             if search:
                 query = """SELECT id, title, date, duration_seconds, participants, 
-                           language, status, created_at, action_items
+                           language, status, task_id, created_at, action_items
                            FROM meetings WHERE title LIKE ? 
                            ORDER BY date DESC LIMIT ? OFFSET ?"""
                 params = (f"%{search}%", limit, offset)
             else:
                 query = """SELECT id, title, date, duration_seconds, participants, 
-                           language, status, created_at, action_items
+                           language, status, task_id, created_at, action_items
                            FROM meetings ORDER BY date DESC LIMIT ? OFFSET ?"""
                 params = (limit, offset)
 

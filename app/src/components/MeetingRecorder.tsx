@@ -225,7 +225,13 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
      }
   };
 
-  return (
+   const handleCancel = () => {
+      if (isProcessing) return;
+      stopListening();
+      onClose();
+   };
+
+   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -236,14 +242,14 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
            className="fixed inset-0 z-[120] flex flex-col bg-white"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-6 border-b border-[#F0EDE8]/50 pt-10">
+          <div className="flex items-center justify-between px-6 py-6 border-b border-[var(--border-color)]/50 pt-10">
              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 shadow-sm border border-red-100/50">
                    <Mic size={20} className={cn(isListening && "animate-pulse")} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-[#1A1C1E] tracking-tight">Live Meeting</h2>
-                  <p className="text-[10px] font-black text-[#8A8886] uppercase tracking-widest leading-none mt-0.5">Recording in progress</p>
+                   <h2 className="text-xl font-black text-[var(--text-main)] tracking-tight">Live Meeting</h2>
+                   <p className="text-[10px] font-black text-[#8A8886] uppercase tracking-widest leading-none mt-0.5">Recording in progress</p>
                 </div>
              </div>
 
@@ -254,18 +260,18 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                 </div>
                 
                 <button 
-                  onClick={!isProcessing ? onClose : undefined}
+                  onClick={handleCancel}
                   disabled={isProcessing}
-                  className="p-3 rounded-2xl bg-[#F8F7F4] hover:bg-[#F0EDE8] transition disabled:opacity-50 border border-[#F0EDE8]"
+                  className="p-3 rounded-2xl bg-[var(--bg)] hover:bg-[var(--border-color)] transition disabled:opacity-50 border border-[var(--border-color)]"
                 >
-                  <X size={20} className="text-[#1A1C1E]" />
+                   <X size={20} className="text-[var(--text-main)]" />
                 </button>
              </div>
           </div>
           
           <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6 overflow-hidden">
              {/* Visualizer Area */}
-             <div className="w-full bg-[#F8F7F4] rounded-[2.5rem] border border-[#F0EDE8] p-8 flex items-center justify-center gap-2 shadow-inner h-32">
+             <div className="w-full bg-[var(--bg)] rounded-[2.5rem] border border-[var(--border-color)] p-8 flex items-center justify-center gap-2 shadow-inner h-32">
                {volumes.map((vol, i) => (
                  <motion.div
                    key={`bar-${i}`}
@@ -274,7 +280,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                      opacity: isProcessing ? 0.3 : (isListening ? 1 : 0.3)
                    }}
                    transition={isProcessing ? { repeat: Infinity, duration: 1.5, delay: i * 0.08 } : { duration: 0.1 }}
-                   className="w-2 bg-[#4F46E5] rounded-full shadow-sm"
+                   className="w-2 bg-[var(--color-orange)] rounded-full shadow-sm"
                  />
                ))}
              </div>
@@ -282,11 +288,11 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
              {/* Transcript Scroll Area */}
              <div 
                 ref={transcriptScrollRef}
-                className="flex-1 w-full bg-white rounded-[2.5rem] border border-[#F0EDE8] p-10 flex flex-col relative overflow-hidden shadow-sm shadow-indigo-100/10"
+                className="flex-1 w-full bg-white rounded-[2.5rem] border border-[var(--border-color)] p-10 flex flex-col relative overflow-hidden shadow-sm shadow-indigo-100/10"
              >
                 {!currentText && !isProcessing && (
                    <div className="flex flex-col items-center justify-center h-full gap-4">
-                      <div className="w-16 h-16 rounded-full bg-[#F8F7F4] flex items-center justify-center text-[#8A8886]/30">
+                      <div className="w-16 h-16 rounded-full bg-[var(--bg)] flex items-center justify-center text-[#8A8886]/30">
                          <Mic size={32} />
                       </div>
                       <p className="text-center italic text-[#8A8886]/60 font-black uppercase tracking-widest text-[10px]">Silakan mulai berbicara...</p>
@@ -294,10 +300,10 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                 )}
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
                   {finalTranscript && (
-                     <p className="text-lg font-bold leading-relaxed text-[#1A1C1E]/80 mb-4 antialiased whitespace-pre-wrap">{finalTranscript}</p>
+                     <p className="text-lg font-bold leading-relaxed text-[var(--text-main)]/80 mb-4 antialiased whitespace-pre-wrap">{finalTranscript}</p>
                   )}
                   {transcript && (
-                     <p className="text-lg font-bold leading-relaxed text-[#4F46E5] antialiased animate-pulse">{transcript}</p>
+                     <p className="text-lg font-bold leading-relaxed text-[var(--color-orange)] antialiased animate-pulse">{transcript}</p>
                   )}
                 </div>
 
@@ -309,11 +315,11 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                          animate={{ opacity: 1 }} 
                          className="absolute inset-0 bg-white/90 backdrop-blur-[6px] flex flex-col items-center justify-center z-10 p-10"
                       >
-                         <div className="w-16 h-16 rounded-full bg-[#4F46E5]/10 flex items-center justify-center mb-6">
-                            <Loader2 size={32} className="text-[#4F46E5] animate-spin" />
+                         <div className="w-16 h-16 rounded-full bg-[var(--color-orange)]/10 flex items-center justify-center mb-6">
+                            <Loader2 size={32} className="text-[var(--color-orange)] animate-spin" />
                          </div>
-                         <h3 className="font-black text-2xl text-[#1A1C1E] text-center max-w-sm tracking-tight">{mapStageToLabel(currentStage)}</h3>
-                         <p className="text-xs font-black text-[#8A8886] uppercase tracking-widest mt-4 bg-[#F8F7F4] px-4 py-1.5 rounded-full border border-[#F0EDE8]">Durasi Rekaman: {formatTime(duration)}</p>
+                         <h3 className="font-black text-2xl text-[var(--text-main)] text-center max-w-sm tracking-tight">{mapStageToLabel(currentStage)}</h3>
+                         <p className="text-xs font-black text-[#8A8886] uppercase tracking-widest mt-4 bg-[var(--bg)] px-4 py-1.5 rounded-full border border-[var(--border-color)]">Durasi Rekaman: {formatTime(duration)}</p>
                       </motion.div>
                    )}
                 </AnimatePresence>
@@ -321,19 +327,19 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
           </div>
 
           {/* Actions Footer */}
-          <div className="p-6 border-t border-[#F0EDE8]/50 bg-white">
+          <div className="p-6 border-t border-[var(--border-color)]/50 bg-white">
              <div className="max-w-4xl mx-auto w-full">
                 {!isProcessing ? (
                    <button 
                       onClick={handleStopAndProcess}
                       disabled={isConfirming || (!currentText && duration < 3)}
-                      className="w-full h-16 rounded-2xl bg-[#4F46E5] hover:bg-[#4338CA] text-white font-black tracking-tight active:scale-[0.98] transition-all shadow-xl shadow-[#4F46E5]/30 flex items-center justify-center gap-3 disabled:opacity-50 text-lg"
+                      className="w-full h-16 rounded-2xl bg-[var(--color-orange)] hover:bg-[#C86646] text-white font-black tracking-tight active:scale-[0.98] transition-all shadow-xl shadow-[var(--color-orange)]/30 flex items-center justify-center gap-3 disabled:opacity-50 text-lg"
                    >
                       {isConfirming ? <Loader2 size={24} className="animate-spin" /> : <Check size={24} strokeWidth={3} />}
                       {isConfirming ? "Menyiapkan File..." : "Akhiri & Simpan MoM"}
                    </button>
                 ) : (
-                   <div className="w-full h-16 rounded-2xl bg-[#F8F7F4] border border-[#F0EDE8] text-[#8A8886] font-black tracking-widest uppercase text-xs flex items-center justify-center gap-2 italic">
+                   <div className="w-full h-16 rounded-2xl bg-[var(--bg)] border border-[var(--border-color)] text-[#8A8886] font-black tracking-widest uppercase text-xs flex items-center justify-center gap-2 italic">
                       Sedang Diproses oleh AI Assistant...
                    </div>
                 )}

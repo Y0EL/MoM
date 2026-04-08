@@ -73,14 +73,17 @@ class DiarizationService:
         try:
             from nemo.collections.asr.models import NeuralDiarizer
             import omegaconf
+            import torch
 
             # NeMo diarization config
             model_path = os.getenv("NEMO_DIARIZER_MODEL", "diar_msdd_telephonic")
+            device = "cuda" if torch.cuda.is_available() else "cpu"
 
             cfg = omegaconf.OmegaConf.structured({
                 "diarizer": {
                     "manifest_filepath": "",
                     "out_dir": tempfile.mkdtemp(),
+                    "device": device,
                     "speaker_embeddings": {
                         "model_path": os.getenv("NEMO_TITANET_MODEL", "titanet_large"),
                         "parameters": {

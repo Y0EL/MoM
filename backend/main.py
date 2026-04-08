@@ -59,7 +59,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -106,20 +106,32 @@ class StatusBus:
     def __init__(self):
         self.queues = {}
 
-    def get_queue(self, task_id: str):
+    def get_queue(self, task_id: str, create_if_missing: bool = True):
         if task_id not in self.queues:
+            if not create_if_missing:
+                return None
             self.queues[task_id] = asyncio.Queue()
         return self.queues[task_id]
 
     async def push(self, task_id: str, data: dict):
-        if task_id in self.queues:
-            await self.queues[task_id].put(data)
+        queue = self.get_queue(task_id)
+        await queue.put(data)
+        if data.get("status") != "transcribing":
+            logger.info(f"[StatusBus] Task {task_id}: {data.get('status')} - {data.get('message')}")
 
     def remove(self, task_id: str):
         if task_id in self.queues:
+            # We don't delete immediately to allow reconnections during long processes
+            # but we can clear it if it's been handled.
+            pass
+
+    def force_remove(self, task_id: str):
+        if task_id in self.queues:
             del self.queues[task_id]
+            logger.info(f"[StatusBus] Force removed queue for {task_id}")
 
 status_bus = StatusBus()
+cancellation_events = {}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -132,6 +144,9 @@ async def transcribe_audio(
     enable_diarization: bool = Form(True),
     task_id: Optional[str] = Form(None),
 ):
+    # Register event loop task for immediate cleanup
+    if task_id:
+        status_bus.get_queue(task_id, create_if_missing=True)
     """
     Terima file audio, jalankan Whisper STT dan (opsional) speaker diarization.
     """
@@ -144,12 +159,30 @@ async def transcribe_audio(
                 "current": current,
                 "total": total,
                 "message": message,
-                "status": "transcribing"
+                "status": "transcribing",
+                "meeting_id": m_id
             })
 
+    # Global override diarization dari env
+    env_diarization = os.getenv("ENABLE_DIARIZATION", "true").lower() == "true"
+    should_diarize = enable_diarization and env_diarization
+    
+    logger.info(f"[Transcribe] Global Diarization: {env_diarization}, Requested: {enable_diarization} -> Final: {should_diarize}")
+
     try:
+        # Register task in DB immediately if possible so it's not lost on refresh
+        m_id = None
         if task_id:
-            await status_bus.push(task_id, {"status": "upload_done", "message": "File diterima, memulai chunking..."})
+            try:
+                m_id = await database_service.create_meeting(
+                    title=audio.filename or "Rekaman Baru",
+                    language=language,
+                    status="processing",
+                    task_id=task_id
+                )
+                await status_bus.push(task_id, {"status": "upload_done", "message": "File diterima, memulai chunking...", "meeting_id": m_id})
+            except Exception as db_e:
+                logger.error(f"[Transcribe] DB initial registration failed: {db_e}")
 
         contents = await audio.read()
         if not contents:
@@ -160,28 +193,38 @@ async def transcribe_audio(
             tmp.write(contents)
             tmp_path = Path(tmp.name)
 
+        # Create cancellation event
+        stop_event = asyncio.Event()
+        if task_id:
+            cancellation_events[task_id] = (stop_event, m_id)
+
         try:
             whisper_result = await ai_service.transcribe_audio_with_segments(
-                contents, language=language, on_progress=on_progress
+                contents, language=language, on_progress=on_progress, stop_event=stop_event
             )
             
             full_text = whisper_result.get("text", "")
             whisper_segments = whisper_result.get("segments", [])
 
             if task_id:
-                await status_bus.push(task_id, {"status": "diarizing", "message": "Menganalisis suara pembicara..."})
+                await status_bus.push(task_id, {"status": "diarizing", "message": "Menganalisis suara pembicara..." if should_diarize else "Melewati diarization..."})
 
             diarized_segments = []
-            if enable_diarization and len(contents) > 1000:
+            if should_diarize and len(contents) > 1000:
                 diar_raw = await diarization_service.diarize(str(tmp_path))
                 diarized_segments = diarization_service.merge_transcript_with_diarization(
                     whisper_segments, diar_raw
                 )
             else:
-                diarized_segments = [{**s, "speaker": "SPEAKER_00"} for s in whisper_segments]
+                diarized_segments = [{**s, "speaker": s.get("speaker", "SPEAKER_00")} for s in whisper_segments]
 
             if task_id:
-                await status_bus.push(task_id, {"status": "done", "message": "Transkripsi selesai!"})
+                await status_bus.push(task_id, {"status": "done", "message": "Transkripsi selesai!", "meeting_id": m_id})
+                # Terminal state, signal queue to close after a short delay
+                async def delayed_remove():
+                    await asyncio.sleep(60) # Keep for 1 min for frontend to catch final state
+                    status_bus.force_remove(task_id)
+                asyncio.create_task(delayed_remove())
 
             return {
                 "text": full_text,
@@ -192,8 +235,16 @@ async def transcribe_audio(
                 "segment_count": len(diarized_segments),
             }
 
+        except asyncio.CancelledError:
+            if task_id:
+                await status_bus.push(task_id, {"status": "error", "message": "Proses dibatalkan oleh pengguna.", "meeting_id": m_id})
+            if m_id:
+                await database_service.update_meeting(m_id, status="error")
+            return JSONResponse(status_code=200, content={"status": "cancelled", "message": "Dibatalkan"})
         finally:
-            if tmp_path.exists():
+            if task_id and task_id in cancellation_events:
+                del cancellation_events[task_id]
+            if 'tmp_path' in locals() and tmp_path.exists():
                 tmp_path.unlink()
 
     except Exception as e:
@@ -203,11 +254,40 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/mom/transcribe/cancel/{task_id}")
+async def cancel_transcription(task_id: str):
+    """Batalkan proses transkripsi dan HAPUS dari database."""
+    if task_id in cancellation_events:
+        event, m_id = cancellation_events[task_id]
+        event.set()
+        logger.info(f"[Transcribe] Set cancellation event for task: {task_id}, meeting: {m_id}")
+        
+        # HAPUS dari database segera agar tidak muncul lagi
+        if m_id:
+            try:
+                await database_service.delete_meeting(m_id)
+                logger.info(f"[Transcribe] Meeting {m_id} deleted from DB via cancel")
+            except Exception as e:
+                logger.error(f"[Transcribe] Failed to delete meeting {m_id}: {e}")
+        
+        # Hapus antrean SSE
+        status_bus.force_remove(task_id)
+        
+        return {"status": "ok", "message": "Proses dihentikan dan dihapus dari database"}
+    return {"status": "not_found", "message": "Tugas tidak ditemukan"}
+
+
 @app.get("/mom/transcribe/stream/{task_id}")
 async def transcribe_progress_stream(task_id: str):
     """SSE endpoint untuk memantau progress transkripsi."""
     async def event_generator():
-        queue = status_bus.get_queue(task_id)
+        logger.info(f"[SSE] Client connected for task: {task_id}")
+        queue = status_bus.get_queue(task_id, create_if_missing=False)
+        if not queue:
+            logger.warning(f"[SSE] Task {task_id} not found/inactive, closing stream.")
+            yield f"data: {json.dumps({'status': 'error', 'message': 'Tugas tidak aktif'})}\n\n"
+            return
+
         try:
             while True:
                 data = await queue.get()
@@ -215,7 +295,7 @@ async def transcribe_progress_stream(task_id: str):
                 if data.get("status") in ["done", "error"]:
                     break
         finally:
-            status_bus.remove(task_id)
+            logger.info(f"[SSE] Stream disconnected for task: {task_id} (Queue kept in memory)")
 
     return StreamingResponse(
         event_generator(),
