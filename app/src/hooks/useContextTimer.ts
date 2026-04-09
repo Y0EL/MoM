@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { useMeetingStore } from '../stores/meetingStore';
+import { useCallback, useEffect, useRef } from 'react';
 import { useContextStore } from '../stores/contextStore';
+import { useMeetingStore } from '../stores/meetingStore';
 
 export const useContextTimer = () => {
   const { isActive, isPaused, duration, userContext } = useMeetingStore();
@@ -62,14 +62,14 @@ export const useContextTimer = () => {
 
     // Current 2-minute segment (0-indexed): segment 0 = 0-2 min, segment 1 = 2-4 min, etc.
     // Trigger at the START of each new segment (i.e., duration just crossed a 2-min boundary)
-    const currentSegment = Math.floor(duration / 120); // 120 seconds = 2 minutes (testing)
+    const currentSegment = Math.floor(duration / 600); // 120 seconds = 2 minutes (testing)
 
     // Only generate if:
     // 1. We have passed at least 1 full segment (duration >= 600s = 10 min)
     // 2. The current segment is new (hasn't been generated yet)
     // 3. Not currently generating
     if (
-      duration >= 120 &&
+      duration >= 600 &&
       currentSegment > stateRef.current.lastGeneratedSegment &&
       !stateRef.current.isGeneratingContext
     ) {
