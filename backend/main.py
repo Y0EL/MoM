@@ -33,7 +33,8 @@ from services.mom_service import mom_service
 from services.database_service import database_service
 from services.export_service import export_service
 from services.diarization_service import diarization_service
-from services.context_service import init_context_service, context_service
+from services.context_service import init_context_service
+import services.context_service as context_service_module
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -747,7 +748,7 @@ async def delete_word_correction(meeting_id: str, word_index: int):
 async def generate_context_card(data: ContextRequest):
     """Generate context card dari transcript segment."""
     try:
-        context_card = await context_service.generate_context_card(
+        context_card = await context_service_module.context_service.generate_context_card(
             transcript=data.transcript,
             segment_index=data.segment_index,
             time_range=data.time_range,

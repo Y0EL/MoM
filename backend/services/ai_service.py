@@ -169,6 +169,40 @@ class AIService:
             if tmp_path.exists():
                 tmp_path.unlink()
 
+    async def generate_response(self, prompt: str, model: str = None, temperature: float = 0.3) -> str:
+        """
+        Generate a text response from OpenAI Chat Completions.
+        Used by context_service for AI context card generation.
+        """
+        model = model or os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+        loop = asyncio.get_event_loop()
+
+        def _call():
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Kamu adalah asisten AI yang menganalisis rapat dan menghasilkan ringkasan konteks "
+                            "dalam format JSON yang terstruktur. Selalu kembalikan respons dalam JSON yang valid."
+                        )
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=temperature,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content or ""
+
+        try:
+            result = await loop.run_in_executor(None, _call)
+            logger.info(f"[AIService] generate_response: {len(result)} chars")
+            return result
+        except Exception as e:
+            logger.error(f"[AIService] generate_response failed: {e}")
+            raise
+
 
 # Singleton
 ai_service = AIService()

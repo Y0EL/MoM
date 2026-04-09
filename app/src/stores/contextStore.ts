@@ -7,27 +7,24 @@ interface ContextState {
   contextCards: ContextCard[];
   isGeneratingContext: boolean;
   
-  // Timer state
-  contextTimer: NodeJS.Timeout | null;
-  lastContextTime: number; // minutes
+  // Segment tracking (replaces interval-based timer with stale closure bug)
+  lastGeneratedSegment: number; // last segment index that was generated (-1 = none)
   
   // Actions
   addContextCard: (card: ContextCard) => void;
   setContextCards: (cards: ContextCard[]) => void;
   setGeneratingContext: (generating: boolean) => void;
-  startContextTimer: (callback: () => void) => void;
-  stopContextTimer: () => void;
+  setLastGeneratedSegment: (segment: number) => void;
   resetContextState: () => void;
 }
 
 export const useContextStore = create<ContextState>()(
   devtools(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       contextCards: [],
       isGeneratingContext: false,
-      contextTimer: null,
-      lastContextTime: 0,
+      lastGeneratedSegment: -1,
 
       // Actions
       addContextCard: (card) => set((state) => ({
@@ -38,38 +35,13 @@ export const useContextStore = create<ContextState>()(
 
       setGeneratingContext: (isGeneratingContext) => set({ isGeneratingContext }),
 
-      startContextTimer: (callback) => {
-        const state = get();
-        if (state.contextTimer) return;
-
-        const timer = setInterval(() => {
-          const currentState = get();
-          if (!currentState.isGeneratingContext) {
-            callback();
-          }
-        }, 60000); // Check every minute
-
-        set({ contextTimer: timer });
-      },
-
-      stopContextTimer: () => {
-        const state = get();
-        if (state.contextTimer) {
-          clearInterval(state.contextTimer);
-          set({ contextTimer: null });
-        }
-      },
+      setLastGeneratedSegment: (lastGeneratedSegment) => set({ lastGeneratedSegment }),
 
       resetContextState: () => {
-        const state = get();
-        if (state.contextTimer) {
-          clearInterval(state.contextTimer);
-        }
         set({
           contextCards: [],
           isGeneratingContext: false,
-          contextTimer: null,
-          lastContextTime: 0
+          lastGeneratedSegment: -1,
         });
       }
     }),

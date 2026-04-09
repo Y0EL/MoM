@@ -276,6 +276,10 @@ export default function App() {
                is_temp: true
             };
             setMeetings(prev => [tempMeeting, ...prev]);
+
+            // ✅ Tutup modal SEGERA setelah data terkumpul, arahkan ke history
+            setShowRecorder(false);
+            setActiveTab("history");
             setActiveMeeting(tempMeeting);
 
             const currentProgressSource = new EventSource(`${BACKEND_URL}/mom/transcribe/stream/${taskId}`);
@@ -285,19 +289,26 @@ export default function App() {
                const data = JSON.parse(e.data);
                setTranscribeProgress(data);
                
-               // Use meeting_id from backend if provided
                const realId = data.meeting_id || taskId;
+
+               if (data.status === "error" || data.status === "done" || data.status === "cancelled") {
+                  currentProgressSource.close();
+                  trackingTasks.current.delete(taskId);
+               }
 
                if (data.status === "transcribing" && data.current != null && data.total != null) {
                   const percent = Math.round((data.current / (data.total || 1)) * 100);
                   const label = `Mentranskrip (${data.current}/${data.total})`;
-                  
                   setMeetings(prev => prev.map(m => (m.id === taskId || m.id === realId) ? { ...m, id: realId, stage: label, stage_raw: "transcribing", transcribe_percent: percent } : m));
                   setActiveMeeting((prev: any) => (prev && (prev.id === taskId || prev.id === realId)) ? { ...prev, id: realId, stage: label, stage_raw: "transcribing", transcribe_percent: percent } : prev);
                } else if (data.message) {
                   setMeetings(prev => prev.map(m => (m.id === taskId || m.id === realId) ? { ...m, id: realId, stage: data.message, stage_raw: data.status || "transcribing" } : m));
                   setActiveMeeting((prev: any) => (prev && (prev.id === taskId || prev.id === realId)) ? { ...prev, id: realId, stage: data.message, stage_raw: data.status || "transcribing" } : prev);
                }
+            };
+            currentProgressSource.onerror = () => {
+               currentProgressSource.close();
+               trackingTasks.current.delete(taskId);
             };
             const fd = new FormData();
             fd.append("audio", blob, "meeting.webm");
@@ -312,18 +323,39 @@ export default function App() {
                const tData = await transcribeRes.json();
                if (tData.duration_seconds) duration = tData.duration_seconds;
                if (tData.text && tData.text.trim().length > 2) finalTranscription = tData.text;
-               else { alert("Transkripsi suara kosong, coba lagi."); setIsProcessing(false); setShowRecorder(false); return; }
+               else {
+                  alert("Transkripsi suara kosong, coba lagi.");
+                  setIsProcessing(false);
+                  setMeetings(prev => prev.filter(m => m.id !== taskId));
+                  setActiveMeeting(null);
+                  return;
+               }
             } else {
                const errData = await transcribeRes.json();
                alert(`Gagal mentranskrip: ${errData.detail || "Error Unknown"}`);
-               setIsProcessing(false); setShowRecorder(false); return;
+               setIsProcessing(false);
+               setMeetings(prev => prev.filter(m => m.id !== taskId));
+               setActiveMeeting(null);
+               return;
             }
+         } else {
+            // Tidak ada audio (hanya transcript), langsung tutup modal dan proses
+            setShowRecorder(false);
+            setActiveTab("history");
          }
-         setShowRecorder(false); setIsProcessing(false); setProcessingStage(""); setActiveTab("history");
-         // Remove placeholder
+
+         setIsProcessing(false);
+         setProcessingStage("");
+         // Remove placeholder before starting real stream
          setMeetings(prev => prev.filter(m => m.id !== taskId));
          executeStream(finalTranscription, defaultLanguage, duration);
-      } catch (err) { console.error("Error Processing:", err); alert("Terjadi kesalahan saat memproses MoM"); setIsProcessing(false); setProcessingStage(""); }
+      } catch (err) {
+         console.error("Error Processing:", err);
+         alert("Terjadi kesalahan saat memproses MoM");
+         setIsProcessing(false);
+         setProcessingStage("");
+         setShowRecorder(false);
+      }
    };
 
    const handleUploadAudio = async (file: File, language: string) => {
@@ -356,6 +388,11 @@ export default function App() {
             // Use meeting_id from backend if provided
             const realId = data.meeting_id || taskId;
 
+            if (data.status === "error" || data.status === "done" || data.status === "cancelled") {
+               currentProgressSource.close();
+               trackingTasks.current.delete(taskId);
+            }
+
             if (data.status === "transcribing" && data.current != null && data.total != null) {
                const percent = Math.round((data.current / (data.total || 1)) * 100);
                const label = `Mentranskrip (${data.current}/${data.total})`;
@@ -366,6 +403,10 @@ export default function App() {
                setMeetings(prev => prev.map(m => (m.id === taskId || m.id === realId) ? { ...m, id: realId, stage: data.message, stage_raw: data.status || "transcribing" } : m));
                setActiveMeeting((prev: any) => (prev && (prev.id === taskId || prev.id === realId)) ? { ...prev, id: realId, stage: data.message, stage_raw: data.status || "transcribing" } : prev);
             }
+         };
+         currentProgressSource.onerror = () => {
+             currentProgressSource.close();
+             trackingTasks.current.delete(taskId);
          };
 
          const fd = new FormData();

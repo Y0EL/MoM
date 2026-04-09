@@ -250,6 +250,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
 
    const handleCancel = () => {
       if (isProcessing) return;
+      // Allow cancel even when confirming — data already handed off to parent
       stopListening();
       onClose();
    };
@@ -284,7 +285,7 @@ export default function MeetingRecorder({ isOpen, onClose, onConfirm, isProcessi
                 
                 <button 
                   onClick={handleCancel}
-                  disabled={isProcessing}
+                  disabled={isProcessing && !isConfirming}
                   className="p-3 rounded-2xl bg-[var(--bg)] hover:bg-[var(--border-color)] transition disabled:opacity-50 border border-[var(--border-color)]"
                 >
                    <X size={20} className="text-[var(--text-main)]" />
